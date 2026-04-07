@@ -1,0 +1,33 @@
+services:
+  transferr:
+    build: .
+    container_name: transferr
+    restart: unless-stopped
+    ports:
+      - "7900:8000"
+    environment:
+      - GOTIFY_URL=${GOTIFY_URL}
+      - GOTIFY_TOKEN=${GOTIFY_TOKEN}
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-America/Argentina/Buenos_Aires}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    volumes:
+      - ./config.yml:/config/config.yml:ro
+      - ./logs:/logs
+      # Montá aquí tus directorios destino definidos en config.yml.
+      # La ruta interna debe coincidir exactamente con la del config.
+      # - /ruta/local/comics:/comics
+      # - /ruta/local/calibre:/calibre
+      # - /ruta/local/music:/music
+    networks:
+      - TuRed
+
+networks:
+  GeneralNetwork:
+    external: true

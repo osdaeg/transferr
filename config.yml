@@ -1,0 +1,13 @@
+# transferr — configuración de destinos
+# Agregá o quitá destinos aquí sin tocar el código.
+# Formato: alias: ruta_dentro_del_contenedor
+#
+# IMPORTANTE: cada ruta que pongas aquí debe tener su volumen
+# correspondiente en docker-compose.yml
+
+destinations:
+  slskd:   /slskd
+  calibre: /calibre
+  comics:  /comics
+  music:   /music
+  booklore:   /booklore

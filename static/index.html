@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>transferr // dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #090c0f;
+    --bg2:       #0d1117;
+    --bg3:       #111820;
+    --border:    #1e2d3d;
+    --green:     #00ff88;
+    --green-dim: #00cc6a;
+    --green-glow:#00ff8833;
+    --red:       #ff3b5c;
+    --red-dim:   #cc1f3d;
+    --amber:     #ffab00;
+    --blue:      #00b4ff;
+    --text:      #c8d8e8;
+    --text-dim:  #6a8099;
+    --text-muted:#3a5060;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .logo-icon {
+    width: 36px;
+    height: 36px;
+    border: 2px solid var(--green);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    box-shadow: 0 0 12px var(--green-glow), inset 0 0 12px var(--green-glow);
+    animation: pulse-border 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse-border {
+    0%, 100% { box-shadow: 0 0 8px var(--green-glow), inset 0 0 8px var(--green-glow); }
+    50%       { box-shadow: 0 0 20px var(--green-glow), inset 0 0 16px var(--green-glow); }
+  }
+
+  .logo-icon svg { width: 20px; height: 20px; fill: var(--green); }
+
+  .logo-text {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 22px;
+    letter-spacing: 4px;
+    color: var(--green);
+    text-shadow: 0 0 20px var(--green-glow);
+  }
+
+  .logo-sub {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    background: var(--bg3);
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+  }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    animation: blink 2s ease-in-out infinite;
+  }
+
+  .dot.error { background: var(--red); box-shadow: 0 0 6px var(--red); animation: none; }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+  }
+
+  .clock {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 16px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+  }
+
+  /* Main layout */
+  main {
+    padding: 28px 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* Section label */
+  .section-label {
+    font-size: 10px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Stats grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    padding: 20px 22px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px;
+    height: 100%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+  }
+
+  .stat-card.error-card::before { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  .stat-card.bytes-card::before { background: var(--blue); box-shadow: 0 0 8px var(--blue); }
+  .stat-card.uptime-card::before { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+
+  .stat-card:hover { border-color: var(--green); }
+
+  .stat-label {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+
+  .stat-value {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 34px;
+    color: var(--green);
+    text-shadow: 0 0 20px var(--green-glow);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-card.error-card .stat-value { color: var(--red); text-shadow: 0 0 20px rgba(255,59,92,0.3); }
+  .stat-card.bytes-card .stat-value { color: var(--blue); text-shadow: 0 0 20px rgba(0,180,255,0.3); }
+  .stat-card.uptime-card .stat-value { font-size: 18px; color: var(--amber); text-shadow: 0 0 20px rgba(255,171,0,0.3); }
+
+  .stat-sub {
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  /* Two column layout */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  /* Panel */
+  .panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+  }
+
+  .panel-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg3);
+  }
+
+  .panel-title {
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .panel-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+
+  /* Destinations */
+  .dest-list {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .dest-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    transition: border-color 0.15s;
+  }
+
+  .dest-row:hover { border-color: var(--green-dim); }
+
+  .dest-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .dest-indicator.ok  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .dest-indicator.err { background: var(--red);   box-shadow: 0 0 6px var(--red); }
+
+  .dest-alias {
+    font-size: 13px;
+    color: var(--green-dim);
+    min-width: 90px;
+    letter-spacing: 1px;
+  }
+
+  .dest-path {
+    font-size: 11px;
+    color: var(--text-muted);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dest-count {
+    font-size: 11px;
+    color: var(--text-dim);
+    min-width: 60px;
+    text-align: right;
+  }
+
+  /* Bar chart */
+  .chart-area {
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .bar-label {
+    min-width: 80px;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  .bar-track {
+    flex: 1;
+    height: 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green-dim), var(--green));
+    box-shadow: 0 0 8px var(--green-glow);
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+
+  .bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 2px;
+    height: 100%;
+    background: white;
+    opacity: 0.4;
+  }
+
+  .bar-val {
+    min-width: 55px;
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: right;
+  }
+
+  /* Activity log */
+  .activity-log {
+    max-height: 460px;
+    overflow-y: auto;
+  }
+
+  .activity-log::-webkit-scrollbar { width: 4px; }
+  .activity-log::-webkit-scrollbar-track { background: var(--bg); }
+  .activity-log::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .log-entry {
+    display: grid;
+    grid-template-columns: 130px 90px 1fr 80px;
+    gap: 0;
+    padding: 9px 18px;
+    border-bottom: 1px solid var(--bg3);
+    align-items: center;
+    transition: background 0.1s;
+  }
+
+  .log-entry:hover { background: var(--bg3); }
+
+  .log-entry.new-entry {
+    animation: flash-in 0.5s ease-out;
+  }
+
+  @keyframes flash-in {
+    from { background: rgba(0,255,136,0.08); }
+    to   { background: transparent; }
+  }
+
+  .log-time {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+  }
+
+  .log-dest {
+    font-size: 11px;
+    color: var(--green-dim);
+    letter-spacing: 1px;
+  }
+
+  .log-file {
+    font-size: 11px;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 10px;
+  }
+
+  .log-file.error { color: var(--red); }
+
+  .log-size {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: right;
+  }
+
+  .log-status {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-right: 6px;
+    flex-shrink: 0;
+  }
+
+  .log-status.ok  { background: var(--green); }
+  .log-status.err { background: var(--red); }
+
+  .log-header {
+    display: grid;
+    grid-template-columns: 130px 90px 1fr 80px;
+    gap: 0;
+    padding: 8px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg3);
+  }
+
+  .log-header span {
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .log-header span:last-child { text-align: right; }
+
+  /* Empty state */
+  .empty-state {
+    padding: 40px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 12px;
+    letter-spacing: 2px;
+  }
+
+  /* Refresh indicator */
+  .refresh-info {
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+  }
+
+  .refresh-info span {
+    color: var(--green-dim);
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .two-col { grid-template-columns: 1fr; }
+    .log-entry { grid-template-columns: 1fr 70px; }
+    .log-entry .log-time, .log-entry .log-dest { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-text">TRANSFERR</div>
+      <div class="logo-sub">file transfer system</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill">
+      <span class="dot" id="status-dot"></span>
+      <span id="status-text">CONNECTING</span>
+    </div>
+    <div class="refresh-info">AUTO-REFRESH <span id="countdown">10</span>s</div>
+    <div class="clock" id="clock">--:--:--</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- Stats -->
+  <div>
+    <div class="section-label">// métricas de sesión</div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Transferencias</div>
+        <div class="stat-value" id="stat-total">—</div>
+        <div class="stat-sub">completadas</div>
+      </div>
+      <div class="stat-card bytes-card">
+        <div class="stat-label">Datos Transferidos</div>
+        <div class="stat-value" id="stat-bytes">—</div>
+        <div class="stat-sub" id="stat-bytes-unit">bytes</div>
+      </div>
+      <div class="stat-card error-card">
+        <div class="stat-label">Errores</div>
+        <div class="stat-value" id="stat-errors">—</div>
+        <div class="stat-sub">en sesión</div>
+      </div>
+      <div class="stat-card uptime-card">
+        <div class="stat-label">Uptime</div>
+        <div class="stat-value" id="stat-uptime">—</div>
+        <div class="stat-sub">desde inicio</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Destinations + Bar chart -->
+  <div class="two-col">
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">// destinos</span>
+        <span class="panel-badge" id="dest-count">0 montados</span>
+      </div>
+      <div class="dest-list" id="dest-list">
+        <div class="empty-state">CARGANDO...</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">// transferencias por destino</span>
+      </div>
+      <div class="chart-area" id="chart-area">
+        <div class="empty-state">SIN DATOS</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Activity log -->
+  <div>
+    <div class="section-label">// actividad reciente</div>
+    <div class="panel">
+      <div class="log-header">
+        <span>timestamp</span>
+        <span>destino</span>
+        <span style="padding:0 10px">archivo</span>
+        <span>tamaño</span>
+      </div>
+      <div class="activity-log" id="activity-log">
+        <div class="empty-state">ESPERANDO TRANSFERENCIAS...</div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  // ── Clock ──────────────────────────────────────────────────────────────────
+  function updateClock() {
+    document.getElementById('clock').textContent =
+      new Date().toLocaleTimeString('es-AR', { hour12: false });
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function formatBytes(bytes) {
+    if (bytes === 0) return ['0', 'B'];
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return [(bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0), units[i]];
+  }
+
+  function formatTime(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleTimeString('es-AR', { hour12: false });
+  }
+
+  function formatUptime(isoStart) {
+    const diff = Math.floor((Date.now() - new Date(isoStart)) / 1000);
+    const h = Math.floor(diff / 3600);
+    const m = Math.floor((diff % 3600) / 60);
+    const s = diff % 60;
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  let lastEntryCount = 0;
+
+  function render(data) {
+    // Status dot
+    document.getElementById('status-dot').className = 'dot';
+    document.getElementById('status-text').textContent = 'ONLINE';
+
+    // Stats
+    document.getElementById('stat-total').textContent = data.total_transfers;
+    document.getElementById('stat-errors').textContent = data.total_errors;
+
+    const [bVal, bUnit] = formatBytes(data.total_bytes);
+    document.getElementById('stat-bytes').textContent = bVal;
+    document.getElementById('stat-bytes-unit').textContent = bUnit;
+    document.getElementById('stat-uptime').textContent = formatUptime(data.started_at);
+
+    // Destinations
+    const dests = data.destinations || {};
+    const destKeys = Object.keys(dests);
+    document.getElementById('dest-count').textContent = `${destKeys.length} montados`;
+
+    const destList = document.getElementById('dest-list');
+    if (destKeys.length === 0) {
+      destList.innerHTML = '<div class="empty-state">SIN DESTINOS CONFIGURADOS</div>';
+    } else {
+      destList.innerHTML = destKeys.map(alias => {
+        const d = dests[alias];
+        const count = data.count_by_dest?.[alias] || 0;
+        const bytes = data.bytes_by_dest?.[alias] || 0;
+        const [bv, bu] = formatBytes(bytes);
+        return `
+          <div class="dest-row">
+            <span class="dest-indicator ${d.accessible ? 'ok' : 'err'}"></span>
+            <span class="dest-alias">${alias}</span>
+            <span class="dest-path">${d.path}</span>
+            <span class="dest-count">${count} / ${bv}${bu}</span>
+          </div>`;
+      }).join('');
+    }
+
+    // Bar chart (by count)
+    const countByDest = data.count_by_dest || {};
+    const chartArea = document.getElementById('chart-area');
+    const maxCount = Math.max(...Object.values(countByDest), 1);
+
+    if (Object.keys(countByDest).length === 0) {
+      chartArea.innerHTML = '<div class="empty-state">SIN DATOS AÚN</div>';
+    } else {
+      chartArea.innerHTML = Object.entries(countByDest)
+        .sort((a, b) => b[1] - a[1])
+        .map(([alias, count]) => {
+          const pct = (count / maxCount * 100).toFixed(1);
+          return `
+            <div class="bar-row">
+              <span class="bar-label">${alias}</span>
+              <div class="bar-track">
+                <div class="bar-fill" style="width:${pct}%"></div>
+              </div>
+              <span class="bar-val">${count} arch.</span>
+            </div>`;
+        }).join('');
+    }
+
+    // Activity log
+    const recent = data.recent || [];
+    const logEl = document.getElementById('activity-log');
+
+    if (recent.length === 0) {
+      logEl.innerHTML = '<div class="empty-state">ESPERANDO TRANSFERENCIAS...</div>';
+      lastEntryCount = 0;
+      return;
+    }
+
+    const newCount = recent.length > lastEntryCount;
+    logEl.innerHTML = recent.map((e, idx) => {
+      const isNew = newCount && idx === 0;
+      const ok = e.success;
+      const [sv, su] = formatBytes(e.size_bytes || 0);
+      return `
+        <div class="log-entry ${isNew ? 'new-entry' : ''}">
+          <span class="log-time">${formatTime(e.started)}</span>
+          <span class="log-dest">${e.destination}</span>
+          <span class="log-file ${ok ? '' : 'error'}">
+            <span class="log-status ${ok ? 'ok' : 'err'}"></span>${e.filename}${!ok && e.error ? ' — ' + e.error : ''}
+          </span>
+          <span class="log-size">${ok ? sv + ' ' + su : '—'}</span>
+        </div>`;
+    }).join('');
+
+    lastEntryCount = recent.length;
+  }
+
+  function setError() {
+    document.getElementById('status-dot').className = 'dot error';
+    document.getElementById('status-text').textContent = 'OFFLINE';
+  }
+
+  // ── Fetch loop ─────────────────────────────────────────────────────────────
+  const INTERVAL = 10;
+  let countdown = INTERVAL;
+
+  async function fetchStats() {
+    try {
+      const res = await fetch('/api/stats');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      render(data);
+    } catch (e) {
+      setError();
+    }
+  }
+
+  // Countdown ticker
+  setInterval(() => {
+    countdown--;
+    document.getElementById('countdown').textContent = countdown;
+    if (countdown <= 0) {
+      countdown = INTERVAL;
+      fetchStats();
+    }
+  }, 1000);
+
+  // Initial load
+  fetchStats();
+</script>
+</body>
+</html>
