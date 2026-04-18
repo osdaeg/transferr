@@ -26,8 +26,8 @@ services:
       # - /ruta/local/calibre:/calibre
       # - /ruta/local/music:/music
     networks:
-      - GeneralNetwork
+      - TuRed
 
 networks:
-  GeneralNetwork:
+  TuRed:
     external: true
