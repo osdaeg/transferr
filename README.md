@@ -4,6 +4,10 @@ Microservicio de transferencia de archivos con dashboard web. Recibe archivos v√
 
 ---
 
+![Dashboard](docs/screenshot.png)
+
+---
+
 ## Caracter√≠sticas
 
 - API REST para recibir y mover archivos
