@@ -30,7 +30,7 @@ Microservicio de transferencia de archivos con dashboard web. Recibe archivos v√
 ### 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/osdaeg/transferr.git
+git clone https://codeberg.org/osdaeg/transferr.git
 cd transferr
 ```
 
