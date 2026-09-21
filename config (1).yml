@@ -1,0 +1,44 @@
+# transferr — configuración de destinos
+# Agregá o quitá destinos aquí sin tocar el código.
+# IMPORTANTE: cada ruta que pongas aquí debe tener su volumen
+# correspondiente en docker-compose.yml
+#
+# ── Formato simple ────────────────────────────────────────────────────────────
+# Usar cuando el filesystem maneja permisos solo (NTFS, SMB, etc.)
+#   alias: /ruta
+#
+# ── Formato extendido ─────────────────────────────────────────────────────────
+# Usar cuando necesitás controlar dueño y permisos (ext4, btrfs, etc.)
+#   alias:
+#     path: /ruta
+#     uid: 1000       # opcional — dueño del archivo
+#     gid: 1000       # opcional — grupo del archivo
+#     mode: "644"     # opcional — permisos en octal (sin 0o)
+#
+# uid/gid/mode son todos opcionales: podés poner solo mode sin uid/gid, etc.
+# El contenedor corre como root para poder hacer chown. No usar user: en compose.
+
+destinations:
+
+  # NTFS / SMB — sin intervención de permisos
+  comics:  /comics
+  music:   /music
+
+  # ext4 — con chown y chmod explícitos
+  slskd:
+    path: /slskd
+    uid: 1000
+    gid: 1000
+    mode: "664"
+
+  calibre:
+    path: /calibre
+    uid: 1000
+    gid: 1000
+    mode: "644"
+
+  books:
+    path: /books
+    uid: 1000
+    gid: 1000
+    mode: "644"

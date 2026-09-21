@@ -17,3 +17,9 @@ destinations:
   downloads: /downloads
   pics: /pics
   videos: /videos
+  states: 
+    path: /importstate
+    uid: 1000
+    gid: 1000
+    mode: "664"
+  

@@ -39,20 +39,91 @@ stats = {
 }
 
 
-def load_destinations() -> dict[str, str]:
+def parse_mode(mode_val) -> int | None:
+    """Convierte '644', '0644', '0o644' o un entero YAML a int octal."""
+    if mode_val is None:
+        return None
+    if isinstance(mode_val, int):
+        # YAML puede parsear 0644 como entero decimal 420 — lo tomamos tal cual
+        return mode_val
+    s = str(mode_val).strip()
+    if s.startswith("0o") or s.startswith("0O"):
+        return int(s, 8)
+    if s.startswith("0") and len(s) > 1:
+        return int(s, 8)
+    # string tipo "644" → octal
+    return int(s, 8)
+
+
+def load_destinations() -> dict[str, dict]:
+    """
+    Retorna un dict con la configuración completa de cada destino:
+      {
+        "alias": {
+          "path": "/ruta",
+          "uid":  1000 | None,
+          "gid":  1000 | None,
+          "mode": 0o644 | None,
+        }, ...
+      }
+    Soporta formato simple (alias: /ruta) y extendido (alias: {path, uid, gid, mode}).
+    """
     try:
         with open(CONFIG_PATH, "r") as f:
             data = yaml.safe_load(f)
-        destinations = data.get("destinations", {})
-        if not destinations:
+        raw = data.get("destinations", {})
+        if not raw:
             log.warning("config.yml no tiene entradas en 'destinations'.")
-        return {k: str(v) for k, v in destinations.items()}
+            return {}
+
+        result = {}
+        for alias, value in raw.items():
+            if isinstance(value, str):
+                # Formato simple
+                result[alias] = {"path": value, "uid": None, "gid": None, "mode": None}
+            elif isinstance(value, dict):
+                # Formato extendido
+                result[alias] = {
+                    "path": str(value.get("path", "")),
+                    "uid":  int(value["uid"])  if value.get("uid")  is not None else None,
+                    "gid":  int(value["gid"])  if value.get("gid")  is not None else None,
+                    "mode": parse_mode(value.get("mode")),
+                }
+            else:
+                log.warning(f"Destino '{alias}' con formato inválido, ignorado.")
+        return result
+
     except FileNotFoundError:
         log.error(f"Archivo de configuración no encontrado: {CONFIG_PATH}")
         return {}
     except yaml.YAMLError as exc:
         log.error(f"Error al parsear config.yml: {exc}")
         return {}
+
+
+def apply_permissions(path: str, uid: int | None, gid: int | None, mode: int | None) -> None:
+    """Aplica chown y/o chmod al archivo si están configurados."""
+    if uid is not None or gid is not None:
+        effective_uid = uid if uid is not None else -1   # -1 = sin cambio
+        effective_gid = gid if gid is not None else -1
+        try:
+            os.chown(path, effective_uid, effective_gid)
+            log.info(f"chown {effective_uid}:{effective_gid} → '{path}'")
+        except PermissionError:
+            log.warning(
+                f"No se pudo hacer chown en '{path}'. "
+                "El contenedor debe correr como root para cambiar el dueño. "
+                "Quitá 'user:' del docker-compose.yml."
+            )
+        except Exception as exc:
+            log.warning(f"chown falló en '{path}': {exc}")
+
+    if mode is not None:
+        try:
+            os.chmod(path, mode)
+            log.info(f"chmod {oct(mode)} → '{path}'")
+        except Exception as exc:
+            log.warning(f"chmod falló en '{path}': {exc}")
 
 
 # ── Gotify ────────────────────────────────────────────────────────────────────
@@ -71,7 +142,7 @@ async def notify(title: str, message: str, priority: int = 5) -> None:
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
-app = FastAPI(title="transferr", version="1.2.0")
+app = FastAPI(title="transferr", version="1.3.0")
 
 STATIC_DIR = "/app/static"
 os.makedirs(STATIC_DIR, exist_ok=True)
@@ -92,7 +163,7 @@ async def health():
     destinations = load_destinations()
     return {
         "status": "ok",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "uptime_since": stats["started_at"],
         "destinations": list(destinations.keys()),
     }
@@ -103,12 +174,19 @@ async def get_stats():
     destinations = load_destinations()
 
     dest_status = {}
-    for alias, path in destinations.items():
+    for alias, cfg in destinations.items():
+        path = cfg["path"]
         try:
             accessible = os.path.isdir(path) and os.access(path, os.W_OK)
         except Exception:
             accessible = False
-        dest_status[alias] = {"path": path, "accessible": accessible}
+        dest_status[alias] = {
+            "path":       path,
+            "accessible": accessible,
+            "uid":        cfg["uid"],
+            "gid":        cfg["gid"],
+            "mode":       oct(cfg["mode"]) if cfg["mode"] is not None else None,
+        }
 
     bytes_by_dest: dict[str, int] = {}
     count_by_dest: dict[str, int] = {}
@@ -131,7 +209,12 @@ async def get_stats():
 
 @app.get("/destinations")
 async def list_destinations():
-    return {"destinations": load_destinations()}
+    dests = load_destinations()
+    # Serializar mode a string legible
+    result = {}
+    for alias, cfg in dests.items():
+        result[alias] = {**cfg, "mode": oct(cfg["mode"]) if cfg["mode"] is not None else None}
+    return {"destinations": result}
 
 
 @app.post("/transfer")
@@ -158,7 +241,8 @@ async def transfer(
         })
         raise HTTPException(status_code=400, detail=msg)
 
-    base_path  = destinations[destination]
+    dest_cfg   = destinations[destination]
+    base_path  = dest_cfg["path"]
     target_dir = os.path.join(base_path, subfolder) if subfolder else base_path
 
     try:
@@ -176,6 +260,7 @@ async def transfer(
             shutil.copyfileobj(file.file, tmp)
             tmp_path = tmp.name
         shutil.move(tmp_path, target_path)
+        apply_permissions(target_path, dest_cfg["uid"], dest_cfg["gid"], dest_cfg["mode"])
     except Exception as exc:
         msg = f"Error al copiar '{filename}' a '{target_path}': {exc}"
         log.error(msg)
